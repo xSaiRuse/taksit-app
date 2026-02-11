@@ -1,171 +1,269 @@
-import { useState, useEffect } from "react"
-import Login from "./components/Login"
+import { useState, useEffect } from "react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from "recharts";
 
 function App() {
-  const [user, setUser] = useState(null)
   const [darkMode, setDarkMode] = useState(
     localStorage.getItem("darkMode") === "true"
-  )
+  );
 
-  const [harcamalar, setHarcamalar] = useState([])
+  const [maas, setMaas] = useState(0);
+  const [planlar, setPlanlar] = useState([]);
+  const [aktifPlan, setAktifPlan] = useState(null);
+  const [yeniPlanAdi, setYeniPlanAdi] = useState("");
 
   useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add("dark")
+    document.documentElement.classList.toggle("dark", darkMode);
+    localStorage.setItem("darkMode", darkMode);
+  }, [darkMode]);
+
+  const planEkle = () => {
+    if (!yeniPlanAdi.trim()) return;
+
+    setPlanlar([
+      ...planlar,
+      {
+        ad: yeniPlanAdi,
+        fiyat: 0,
+        taksit: 1,
+        odenenList: [],
+      },
+    ]);
+    setYeniPlanAdi("");
+  };
+
+  const planGuncelle = (index, alan, deger) => {
+    const guncel = [...planlar];
+    guncel[index][alan] = Number(deger);
+    setPlanlar(guncel);
+  };
+
+  const taksitToggle = (planIndex, taksitNo) => {
+    const guncel = [...planlar];
+    const liste = guncel[planIndex].odenenList;
+
+    if (liste.includes(taksitNo)) {
+      guncel[planIndex].odenenList = liste.filter((x) => x !== taksitNo);
     } else {
-      document.documentElement.classList.remove("dark")
+      guncel[planIndex].odenenList = [...liste, taksitNo];
     }
 
-    localStorage.setItem("darkMode", darkMode)
-  }, [darkMode])
+    setPlanlar(guncel);
+  };
 
-  if (!user) {
-    return <Login setUser={setUser} />
-  }
-
-  const harcamaEkle = (harcama) => {
-    setHarcamalar([...harcamalar, harcama])
-  }
-
-  const odemeToggle = (index) => {
-    const guncel = [...harcamalar]
-    guncel[index].odendi = !guncel[index].odendi
-    setHarcamalar(guncel)
-  }
-
-  const aylikToplam = harcamalar.reduce(
-    (toplam, h) => toplam + (h.aylik || h.tutar),
+  const toplamBorc = planlar.reduce((acc, p) => acc + p.fiyat, 0);
+  const aylikTaksit = planlar.reduce(
+    (acc, p) => acc + p.fiyat / p.taksit,
     0
-  )
+  );
+  const kalanPara = maas - aylikTaksit;
+
+  let grafikData = [];
+  let toplamTaksit = 0;
+  let toplamOdenen = 0;
+
+  planlar.forEach((plan, pIndex) => {
+    const aylik = plan.fiyat / plan.taksit;
+
+    for (let i = 1; i <= plan.taksit; i++) {
+      grafikData.push({
+        name: `${plan.ad} ${i}`,
+        tutar: aylik,
+        odenmis: plan.odenenList.includes(i),
+        planIndex: pIndex,
+        taksitNo: i,
+      });
+
+      toplamTaksit++;
+      if (plan.odenenList.includes(i)) toplamOdenen++;
+    }
+  });
+
+  const yuzde =
+    toplamTaksit === 0
+      ? 0
+      : ((toplamOdenen / toplamTaksit) * 100).toFixed(1);
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-white transition-colors duration-300">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-white p-4 md:p-8 transition-all">
 
-      {/* TOP BAR */}
-      <div className="flex justify-between items-center p-4 shadow-md bg-white dark:bg-gray-800">
-        <h1 className="text-xl font-bold">Taksit Dashboard</h1>
-
+      {/* HEADER */}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-xl md:text-2xl font-bold">
+          Taksit Dashboard
+        </h1>
         <button
           onClick={() => setDarkMode(!darkMode)}
-          className="px-4 py-2 rounded-full bg-gray-200 dark:bg-gray-700"
+          className="px-4 py-2 bg-gray-300 dark:bg-gray-700 rounded"
         >
           {darkMode ? "☀ Light" : "🌙 Dark"}
         </button>
       </div>
 
-      <div className="p-6 max-w-4xl mx-auto">
+      {/* MAAS */}
+      <input
+        type="number"
+        placeholder="Toplam Maaş"
+        value={maas}
+        onChange={(e) => setMaas(Number(e.target.value))}
+        className="w-full p-3 rounded text-black mb-6"
+      />
 
-        {/* AYLIK TOPLAM */}
-        <div className="mb-6 p-4 bg-indigo-600 text-white rounded-xl shadow">
-          <h3 className="text-sm opacity-80">Toplam Aylık Taksit</h3>
-          <p className="text-2xl font-bold">
-            {aylikToplam.toFixed(2)} ₺
-          </p>
+      {/* PLAN EKLE */}
+      <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow mb-6">
+        <div className="flex flex-col md:flex-row gap-2">
+          <input
+            placeholder="Yeni Plan Adı"
+            value={yeniPlanAdi}
+            onChange={(e) => setYeniPlanAdi(e.target.value)}
+            className="w-full p-2 rounded text-black"
+          />
+          <button
+            onClick={planEkle}
+            className="bg-purple-600 text-white px-4 rounded"
+          >
+            Ekle
+          </button>
         </div>
 
-        {/* HARCAMA EKLE */}
-        <HarcamaBolum
-          harcamaEkle={harcamaEkle}
-          harcamalar={harcamalar}
-          odemeToggle={odemeToggle}
-        />
-
-      </div>
-    </div>
-  )
-}
-
-function HarcamaBolum({ harcamaEkle, harcamalar, odemeToggle }) {
-  const [isim, setIsim] = useState("")
-  const [tutar, setTutar] = useState("")
-  const [taksit, setTaksit] = useState(1)
-
-  const handleEkle = () => {
-    if (!isim || !tutar) return
-
-    harcamaEkle({
-      isim,
-      tutar: Number(tutar),
-      taksit: Number(taksit),
-      aylik: Number(tutar) / Number(taksit),
-      odendi: false
-    })
-
-    setIsim("")
-    setTutar("")
-    setTaksit(1)
-  }
-
-  return (
-    <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow space-y-4">
-
-      <h2 className="text-lg font-bold">Harcamalar</h2>
-
-      <div className="flex gap-2 flex-wrap">
-        <input
-          placeholder="Harcama adı"
-          value={isim}
-          onChange={(e) => setIsim(e.target.value)}
-          className="p-2 rounded border text-black"
-        />
-
-        <input
-          type="number"
-          placeholder="Toplam Tutar"
-          value={tutar}
-          onChange={(e) => setTutar(e.target.value)}
-          className="p-2 rounded border w-32 text-black"
-        />
-
-        <input
-          type="number"
-          placeholder="Taksit"
-          value={taksit}
-          min="1"
-          onChange={(e) => setTaksit(e.target.value)}
-          className="p-2 rounded border w-24 text-black"
-        />
-
-        <button
-          onClick={handleEkle}
-          className="bg-purple-600 text-white px-4 rounded"
-        >
-          Ekle
-        </button>
-      </div>
-
-      {harcamalar.map((h, index) => (
-        <div
-          key={index}
-          className="bg-gray-200 dark:bg-gray-700 p-4 rounded"
-        >
-          <div className="flex justify-between items-center">
-            <div>
-              <p className="font-semibold">{h.isim}</p>
-              <p className="text-sm">
-                Toplam: {h.tutar} ₺
-              </p>
-              <p className="text-sm">
-                {h.taksit} taksit • Aylık: {h.aylik.toFixed(2)} ₺
-              </p>
-            </div>
-
-            <button
-              onClick={() => odemeToggle(index)}
-              className={`px-3 py-1 rounded ${
-                h.odendi
-                  ? "bg-green-500 text-white"
-                  : "bg-red-500 text-white"
+        <div className="mt-4 space-y-2">
+          {planlar.map((plan, index) => (
+            <div
+              key={index}
+              onClick={() => setAktifPlan(index)}
+              className={`p-3 rounded cursor-pointer ${
+                aktifPlan === index
+                  ? "bg-purple-600 text-white"
+                  : "bg-gray-200 dark:bg-gray-700"
               }`}
             >
-              {h.odendi ? "Ödendi" : "Ödenmedi"}
-            </button>
+              {plan.ad}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* PLAN DETAY */}
+      {aktifPlan !== null && (
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow mb-6">
+          <h3 className="mb-4 font-semibold">
+            {planlar[aktifPlan].ad} Detay
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input
+              type="number"
+              placeholder="Toplam Fiyat"
+              value={planlar[aktifPlan].fiyat}
+              onChange={(e) =>
+                planGuncelle(aktifPlan, "fiyat", e.target.value)
+              }
+              className="p-2 rounded text-black"
+            />
+
+            <input
+              type="number"
+              placeholder="Taksit Sayısı"
+              value={planlar[aktifPlan].taksit}
+              onChange={(e) =>
+                planGuncelle(aktifPlan, "taksit", e.target.value)
+              }
+              className="p-2 rounded text-black"
+            />
           </div>
         </div>
-      ))}
+      )}
 
+      {/* ÖZET */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <Card title="Toplam Maaş" value={`${maas} ₺`} />
+        <Card title="Toplam Borç" value={`${toplamBorc} ₺`} red />
+        <Card title="Aylık Taksit" value={`${aylikTaksit.toFixed(2)} ₺`} yellow />
+        <Card title="Kalan Para" value={`${kalanPara.toFixed(2)} ₺`} green />
+      </div>
+
+      {/* İLERLEME */}
+      {toplamTaksit > 0 && (
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow mb-6">
+          <h3 className="mb-2 font-semibold">
+            Ödeme İlerlemesi (%{yuzde})
+          </h3>
+
+          <div className="w-full bg-gray-300 dark:bg-gray-700 h-4 rounded-full overflow-hidden">
+            <div
+              className="h-4 bg-green-500 transition-all duration-700"
+              style={{ width: `${yuzde}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* GRAFİK */}
+      {grafikData.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 p-4 md:p-6 rounded-xl shadow">
+          <h3 className="mb-4 font-semibold">
+            Taksit Takip Grafiği
+          </h3>
+
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={grafikData}>
+              <XAxis hide />
+              <YAxis />
+              <Tooltip />
+              <Bar dataKey="tutar">
+                {grafikData.map((entry, index) => (
+                  <Cell
+                    key={index}
+                    fill={entry.odenen ? "#22c55e" : "#ef4444"}
+                    onClick={() =>
+                      taksitToggle(
+                        entry.planIndex,
+                        entry.taksitNo
+                      )
+                    }
+                    style={{ cursor: "pointer" }}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+
+          <div className="flex gap-6 mt-4 text-sm">
+            <span className="text-green-500">● Ödenmiş</span>
+            <span className="text-red-500">● Ödenmemiş</span>
+          </div>
+        </div>
+      )}
     </div>
-  )
+  );
 }
 
-export default App
+function Card({ title, value, red, green, yellow }) {
+  return (
+    <div className="bg-white dark:bg-gray-800 p-4 rounded shadow">
+      <h4>{title}</h4>
+      <p
+        className={`font-bold ${
+          red
+            ? "text-red-500"
+            : green
+            ? "text-green-500"
+            : yellow
+            ? "text-yellow-500"
+            : ""
+        }`}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+export default App;
