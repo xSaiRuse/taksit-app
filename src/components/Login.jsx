@@ -2,18 +2,24 @@ import { useState } from "react"
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth"
 import { auth } from "../firebase"
 
-export default function Login() {
+export default function Login({ setUser }) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [register, setRegister] = useState(false)
 
   const handleSubmit = async () => {
     try {
+      let userCredential
+
       if (register) {
-        await createUserWithEmailAndPassword(auth, email, password)
+        userCredential = await createUserWithEmailAndPassword(auth, email, password)
       } else {
-        await signInWithEmailAndPassword(auth, email, password)
+        userCredential = await signInWithEmailAndPassword(auth, email, password)
       }
+
+      // 🔥 EN ÖNEMLİ SATIR
+      setUser(userCredential.user)
+
     } catch (err) {
       alert(err.message)
     }
